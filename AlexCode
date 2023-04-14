@@ -15,6 +15,7 @@ library(nnet)
 library(car)
 library(lmtest)
 library(ggplot2)
+library(purrr)
 ```
 
 ```{r, message = FALSE}
@@ -33,5 +34,11 @@ data <- read_excel_allsheets("output.xlsx")
 
 # remove first column in list
 data <- lapply(data, function(X) X[!names(X) %in% c("...1")])
-data
+
+# convert list to data frame
+data2 <- as.data.frame(do.call(cbind, data))
+head(data2)
 ```
+
+
+
