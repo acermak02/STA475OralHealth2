@@ -7,5 +7,31 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(kableExtra)
+library(scales)
+library(nnet)
+library(car)
+library(lmtest)
+library(ggplot2)
 ```
 
+```{r, message = FALSE}
+## NOTE: Data cleaning was performed in Python and new xlsx file was created for use here ##
+
+# create function to read in all excel sheets of pretest data
+read_excel_allsheets <- function(datafile, tibble = FALSE) {
+    sheets <- excel_sheets(datafile)
+    x <- lapply(sheets, function(X) read_excel(datafile, sheet = X, n_max = 20))
+    if(!tibble) x <- lapply(x, as.data.frame)
+    names(x) <- sheets
+    x
+}
+# read in pretest data
+data <- read_excel_allsheets("output.xlsx")
+
+# remove first column in list
+data <- lapply(data, function(X) X[!names(X) %in% c("...1")])
+data
+```
