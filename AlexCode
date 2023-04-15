@@ -16,6 +16,7 @@ library(car)
 library(lmtest)
 library(ggplot2)
 library(purrr)
+library(tidyr)
 ```
 
 ```{r, message = FALSE}
@@ -37,8 +38,42 @@ data <- lapply(data, function(X) X[!names(X) %in% c("...1")])
 
 # convert list to data frame
 data2 <- as.data.frame(do.call(cbind, data))
-head(data2)
+
+# convert all variables to character
+data2 <- data2 %>%
+  mutate(across(everything(), as.factor))
+
+names(data2) <- make.names(names(data2), unique = TRUE)
+
+data2 <- data2 %>%
+  subset(select = -c(Chapter.1.Question, Chapter.2.Question, Chapter.3.Question,
+                  Chapter.4.Question, Chapter.5.Question, Chapter.6.Question,
+                  Chapter.7.Question, Chapter.14.Question, Chapter.15.Question))
+# pivot longer
+data3 <- data2 %>%
+  pivot_longer(everything()) %>%
+  separate(name, c("drop","Chapter","StNum"), sep = ".", extra = "merge")
+data3 <- data3%>%
+  separate(StNum, c("drop2", "ChapterNum", "StudentNum", sep = ".", extra = "merge")) %>%
+  subset(select = c(ChapterNum, StudentNum, value))
+data4 <- data3 %>%
+  group_by(ChapterNum, StudentNum)%>%
+  mutate(QuestionNum = row_number())
+data4 <- data4 %>%
+  mutate(Question = ifelse(QuestionNum == 1, "Q1",
+                        ifelse(QuestionNum == 2, "Q2",
+                             ifelse(QuestionNum == 3, "Q3",
+                                  ifelse(QuestionNum == 4, "Q4",
+                                      ifelse(QuestionNum == 5, "Q5",
+                                          ifelse(QuestionNum == 6, "Q6",
+                                              ifelse(QuestionNum == 7, "Q7",
+                                                  ifelse(QuestionNum == 8, "Q8",
+                                                      ifelse(QuestionNum ==9, "Q9",
+                                                          ifelse(QuestionNum == 10, "Q10",
+                                                              ifelse(QuestionNum == 11, "Q11",
+                                                                  ifelse(QuestionNum == 12, "Q12", "b")))))))))))))
+col_order <- c("ChapterNum", "Question", "StudentNum", "value")
+pretest <- data4[,col_order]
+pretest
 ```
-
-
 
