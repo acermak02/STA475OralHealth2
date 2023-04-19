@@ -19,7 +19,9 @@ library(purrr)
 library(tidyr)
 ```
 
-```{r, message = FALSE}
+## Data Cleaning: Pretest
+
+```{r, message = FALSE, warning = FALSE}
 ## NOTE: Data cleaning was performed in Python and new xlsx file was created for use here ##
 
 # create function to read in all excel sheets of pretest data
@@ -55,7 +57,21 @@ data3 <- data2 %>%
   separate(name, c("drop","Chapter","StNum"), sep = ".", extra = "merge")
 data3 <- data3%>%
   separate(StNum, c("drop2", "ChapterNum", "StudentNum", sep = ".", extra = "merge")) %>%
-  subset(select = c(ChapterNum, StudentNum, value))
+  subset(select = c(drop2, ChapterNum, StudentNum, value))
+data3b <- data3 %>%
+  select(drop2,ChapterNum, value)
+
+# move participant information to new data frame
+data3b <- data3b[data3b$drop2 == "rticipants",]
+
+# select values for each demographic
+StudentNum <- data3b[2:247,2]
+StudentGender <- data3b[2:247,3]
+StudentGrade <- data3b[249:494,3]
+StudentAge <- data3b[496:741,3]
+data3c <- cbind(StudentNum, StudentGender, StudentGrade, StudentAge)
+colnames(data3c) <- c("StudentNum", "StudentGender", "StudentGrade", "StudentAge")
+
 data4 <- data3 %>%
   group_by(ChapterNum, StudentNum)%>%
   mutate(QuestionNum = row_number())
@@ -72,8 +88,100 @@ data4 <- data4 %>%
                                                           ifelse(QuestionNum == 10, "Q10",
                                                               ifelse(QuestionNum == 11, "Q11",
                                                                   ifelse(QuestionNum == 12, "Q12", "b")))))))))))))
-col_order <- c("ChapterNum", "Question", "StudentNum", "value")
-pretest <- data4[,col_order]
+
+# delete participant info from other data
+data4b <- subset(data4, data4$StudentNum !="rticipants")
+
+# merge scores and participant data togehter
+data5 <- merge(data4b, data3c, by = "StudentNum")
+data5 <- data5 %>%
+  mutate(value = factor(value, levels = c(0,1)),
+         ChapterNum = as.numeric(ChapterNum))%>%
+  group_by(StudentNum, ChapterNum, QuestionNum)
+
+# keep relevant variables
+data5 <- data5 %>%
+  subset(select = c(StudentNum, StudentGender, StudentGrade, 
+                    StudentAge, ChapterNum, Question, value))
+
+# reorder variables
+pretest <- data5 %>%
+  group_by(StudentNum) %>%
+  arrange(ChapterNum, Question)
 pretest
 ```
+
+
+## Data Cleaning: Posttest
+```{r, message = FALSE, warning = FALSE}
+# read in data and change column names
+data <- read_xlsx("posttest.xlsx", skip = 1)
+colnames(data) <- c("Student_Num","C1_Q1", "C1_Q2", "C1_Q3", "C1_Q4", "C1_Q5A", "C1_Q5B",
+                    "C2_Q1", "C2_Q2", "C2_Q3", "C2_Q4", "C2_Q5", "C2_Q6",
+                    "C3_Q1", "C3_Q2","C3_Q3","C3_Q4","C3_Q5",
+                    "C4_Q1", "C4_Q2", "C4_Q3", "C4_Q4",
+                    "C5_Q1", "C5_Q2", "C5_Q3", "C5_Q4", "C5_Q5", "C5_Q6",
+                    "C6_Q1", "C6_Q2", "C6_Q3", "C6_Q4", "C6_Q5", "C6_Q6",
+                    "C7_Q1", "C7_Q2", "C7_Q3", "C7_Q4", "C7_Q5", "C7_Q6",
+                    "C14C15_Q1", "C14C15_Q2", "C14C15_Q3", "C14C15_Q4",
+                    "C14C15_Q5", "C14C15_Q6")
+
+# remove NA columns
+data <- data[,-c(47:49)]
+
+# rotate the data longer
+data_longer <- pivot_longer(data, cols = -c("Student_Num"),
+                            names_to = "Chapter_Question",
+                            values_to = "Score")
+
+# create variable for health literacy
+data_longer <- data_longer %>%
+  mutate(Health_Lit = ifelse(Chapter_Question == "C1_Q1" | Chapter_Question =="C1_Q3" |
+                               Chapter_Question =="C2_Q1" | Chapter_Question =="C2_Q4" |
+                               Chapter_Question =="C2_Q5" | Chapter_Question =="C2_Q6" | 
+                               Chapter_Question =="C3_Q1" | Chapter_Question =="C3_Q4" | 
+                               Chapter_Question =="C3_Q5" | Chapter_Question =="C4_Q2" |
+                               Chapter_Question =="C4_Q3" | Chapter_Question =="C5_Q6" |
+                               Chapter_Question =="C6_Q3" | Chapter_Question =="C6_Q6" | 
+                               Chapter_Question =="C7_Q6" |  Chapter_Question =="C14C15_Q2" |
+                               Chapter_Question =="C14C15_Q4", "Behavior",
+                             ifelse(Chapter_Question == "C1_Q2" | Chapter_Question =="C2_Q3" | 
+                                      Chapter_Question =="C3_Q3" | Chapter_Question =="C5_Q3" |
+                                      Chapter_Question =="C6_Q1" | Chapter_Question =="C6_Q2" | 
+                                      Chapter_Question =="C6_Q4" | Chapter_Question =="C6_Q5", 
+                                    "Product",
+                                    ifelse(Chapter_Question == "C1_Q5A" | Chapter_Question =="C1_Q5B" | 
+                                             Chapter_Question =="C5_Q1" | Chapter_Question =="C5_Q5" | 
+                                             Chapter_Question =="C14C15_Q1" | Chapter_Question =="C14C15_Q6",
+                                           "Services",
+                                           ifelse(Chapter_Question == "C1_Q4" | Chapter_Question =="C2_Q2" |
+                                             Chapter_Question =="C3_Q2" | Chapter_Question =="C4_Q1" |
+                                               Chapter_Question =="C4_Q4" | Chapter_Question =="C5_Q2" | 
+                                               Chapter_Question =="C5_Q4" | Chapter_Question =="C7_Q1" | 
+                                               Chapter_Question =="C7_Q2" | Chapter_Question =="C7_Q3" | 
+                                               Chapter_Question =="C7_Q4" | Chapter_Question =="C7_Q5" |
+                                               Chapter_Question =="C14C15_Q3" | Chapter_Question =="C14C15_Q5",
+                                             "Information", NA)))))
+
+data_longer2 <- data_longer %>%
+  separate(Chapter_Question, c("Chapter","Question"))
+
+# rearrange chapter order
+lvls <- c("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C14C15")
+posttest <- data_longer2 %>%
+  mutate(Chapter = factor(Chapter, levels = lvls)) %>%
+  arrange(Chapter)
+posttest
+```
+
+
+## Data Visualizations
+```{r}
+# pretest visualizations
+ggplot(data = pretest)+
+  geom_bar(aes(x = Question, fill = value))+
+  facet_wrap(.~ ChapterNum)
+```
+
+
 
