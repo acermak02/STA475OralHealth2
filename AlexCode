@@ -17,6 +17,7 @@ library(lmtest)
 library(ggplot2)
 library(purrr)
 library(tidyr)
+library(lme4)
 ```
 
 ## Data Cleaning: Pretest
@@ -97,22 +98,48 @@ data5 <- merge(data4b, data3c, by = "StudentNum")
 data5 <- data5 %>%
   mutate(value = factor(value, levels = c(0,1)),
          ChapterNum = as.numeric(ChapterNum))%>%
-  group_by(StudentNum, ChapterNum, QuestionNum)
+  group_by(StudentNum, ChapterNum, Question)
 
 # keep relevant variables
+lvl <- c(1,2,3,4,5,6,7,14,15)
 data5 <- data5 %>%
+  mutate(StudentNum = as.numeric(StudentNum),
+         ChapterNum = factor(ChapterNum, levels = lvl))%>%
   subset(select = c(StudentNum, StudentGender, StudentGrade, 
                     StudentAge, ChapterNum, Question, value))
 
-# reorder variables
-pretest <- data5 %>%
-  group_by(StudentNum) %>%
-  arrange(ChapterNum, Question)
+# reverse code Q8 and Q9
+data5b <- data5%>%
+  pivot_wider(names_from = Question,
+              values_from = value)%>%
+  mutate(Q8 = factor(ifelse(Q8==1, 0, 1)),
+         Q9 = factor(ifelse(Q9==1, 0, 1)))%>%
+  pivot_longer(cols = c(Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q10, Q11, Q12),
+               names_to = "Question",
+               values_to = "Response")
+
+# add KAB indicators
+data5b <- data5b %>%
+  mutate(KAB = ifelse(Question=="Q2" |
+                              Question=="Q3"|
+                              Question=="Q5"|
+                              Question=="Q7"|
+                              Question=="Q8", "Knowledge", 
+                        ifelse(Question=="Q1"|
+                             Question=="Q4"|
+                             Question=="Q10"|
+                             Question=="Q11", "Behavior", 
+                             ifelse(Question == "Q6" | 
+                                    Question == "Q9" | 
+                                    Question == "Q12", "Attitude", NA))))
+# write final variable name
+pretest <- data5b 
 pretest
 ```
 
 
 ## Data Cleaning: Posttest
+
 ```{r, message = FALSE, warning = FALSE}
 # read in data and change column names
 data <- read_xlsx("posttest.xlsx", skip = 1)
@@ -166,22 +193,194 @@ data_longer <- data_longer %>%
 data_longer2 <- data_longer %>%
   separate(Chapter_Question, c("Chapter","Question"))
 
+data_longer2$Score <- as.factor(data_longer2$Score)
+
 # rearrange chapter order
-lvls <- c("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C14C15")
+lvl2 <- c("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C14C15")
 posttest <- data_longer2 %>%
-  mutate(Chapter = factor(Chapter, levels = lvls)) %>%
+  mutate(Chapter = factor(Chapter, levels = lvl2)) %>%
   arrange(Chapter)
 posttest
 ```
 
 
 ## Data Visualizations
+
 ```{r}
-# pretest visualizations
-ggplot(data = pretest)+
-  geom_bar(aes(x = Question, fill = value))+
-  facet_wrap(.~ ChapterNum)
+# pretest visualizations #
+
+## line plot with means (NAs removed!!!)
+pre_means <- pretest %>%
+  group_by(ChapterNum)%>%
+  mutate(Resp_mean = mean(as.numeric(as.character(Response)), na.rm = TRUE),
+         Resp_sd = sd(as.numeric(as.character(Response)), na.rm = TRUE))
+
+ggplot(aes(x = ChapterNum, y = Resp_mean, group = 1), data = pre_means) +
+  geom_errorbar(aes(ymin = Resp_mean - Resp_sd, ymax = Resp_mean + Resp_sd),
+                color = '#009E73')+
+  geom_point(color = '#56B4E9', size = 3)+
+  geom_text(aes(label = round(Resp_mean, digits = 4)),
+            hjust = -0.5, vjust = -0.05, angle = 45, size = 3.5)+
+  labs(x = "Chapter", y = "Mean Response",
+       caption = "Note: All N/A values are removed from the mean calculation")+
+  ggtitle("Average Pretest Responses by Chapter",
+          subtitle = "with error bars")+
+   theme_bw()+
+   theme(plot.title = element_text(hjust = 0.5),
+         plot.subtitle = element_text(hjust = 0.5),
+         panel.border = element_blank(),
+         axis.line = element_line(color = "black"))
+
+## line plot with means, behavior questions (NAs removed!!!)
+pre_means2 <- pretest[pretest$KAB == "Behavior",]
+
+pre_means2 <- pre_means2 %>%
+  group_by(ChapterNum) %>%
+  mutate(BResp_mean = mean(as.numeric(as.character(Response)), na.rm = TRUE),
+         BResp_sd = sd(as.numeric(as.character(Response)), na.rm = TRUE))
+  
+ggplot(aes(x = ChapterNum, y = BResp_mean, group = 1), data = pre_means2) +
+  geom_errorbar(aes(ymin = BResp_mean - BResp_sd, ymax = BResp_mean + BResp_sd),
+                color = '#009E73')+
+  geom_point(color = '#56B4E9', size = 3)+
+  geom_text(aes(label = round(BResp_mean, digits = 4)),
+            hjust = -0.5, vjust = -0.05, angle = 45, size = 3.5)+
+  labs(x = "Chapter", y = "Mean Response",
+       caption = "Note: All N/A values are removed from the mean calculation")+
+  ggtitle("Average Pretest Responses by Chapter on Behavior Questions",
+          subtitle = "with error bars")+
+   theme_bw()+
+   theme(plot.title = element_text(hjust = 0.5),
+         plot.subtitle = element_text(hjust = 0.5),
+         panel.border = element_blank(),
+         axis.line = element_line(color = "black"))
+
+# posttest visualizations #
+
+## line plot with means (NAs removed!!!)
+post_means <- posttest[posttest$Score != 0,]
+post_means <- post_means %>%
+  group_by(Chapter) %>%
+  mutate(Score_mean = mean(as.numeric(as.character(Score)), na.rm = TRUE),
+         Score_sd = sd(as.numeric(as.character(Score)), na.rm = TRUE))
+
+ggplot(aes(x = Chapter, y = Score_mean, group = 1), data = post_means) +
+  geom_errorbar(aes(ymin = Score_mean - Score_sd, ymax = Score_mean + Score_sd),
+                color = '#009E73')+
+  geom_point(color = '#56B4E9', size = 3)+
+  geom_text(aes(label = round(Score_mean, digits = 4)),
+            hjust = -0.5, vjust = -0.05, angle = 45, size = 3.5)+
+  labs(x = "Chapter", y = "Mean Score",
+       caption = "Note: All N/A values and missing scores (0) are removed from the mean calculation.")+
+  ggtitle("Average Posttest Scores by Chapter",
+          subtitle = "with error bars")+
+   theme_bw()+
+   theme(plot.title = element_text(hjust = 0.5),
+         plot.subtitle = element_text(hjust = 0.5),
+         panel.border = element_blank(),
+         axis.line = element_line(color = "black"))
+
+## line plot with means, behavior questions (NAs removed!!!)
+post_means2 <- posttest[posttest$Health_Lit == "Behavior",]
+post_means2 <- post_means2[post_means2$Score != 0,]
+
+post_means2 <- post_means2%>%
+  group_by(Chapter) %>%
+  mutate(BScore_mean = mean(as.numeric(as.character(Score)), na.rm = TRUE),
+         BScore_sd = sd(as.numeric(as.character(Score)), na.rm = TRUE)) 
+
+ggplot(aes(x = Chapter, y = BScore_mean, group = 1), data = post_means2) +
+  geom_errorbar(aes(ymin = BScore_mean - BScore_sd, ymax = BScore_mean + BScore_sd),
+                color = '#009E73')+
+  geom_point(color = '#56B4E9', size = 3)+
+  geom_text(aes(label = round(BScore_mean, digits = 4)),
+            hjust = -0.5, vjust = -0.05, angle = 45, size = 3.5)+
+  labs(x = "Chapter", y = "Mean Score",
+       caption = "Note: All N/A values and missing scores (0) are removed from the mean calculation.")+
+  ggtitle("Average Postest Responses by Chapter on Behavior Questions",
+          subtitle = "with error bars")+
+   theme_bw()+
+   theme(plot.title = element_text(hjust = 0.5),
+         plot.subtitle = element_text(hjust = 0.5),
+         panel.border = element_blank(),
+         axis.line = element_line(color = "black"))
 ```
 
+## Repeated Measures Models (Generalized linear mixed model)
+```{r}
+# merge pretest and posttest together by student
+colnames(pretest) <- c("StudentNum", "StudentGender", "StudentGrade", "StudentAge","ChapterNum", 
+                       "PreQuestion", "PreResponse", "PreKAB")
+colnames(posttest) <- c("StudentNum", "ChapterNum", "PostQuestion", "PostScore", "PostHLit")
+
+alltests <- merge(pretest, posttest, by = "StudentNum")
+alltests <- alltests %>%
+  mutate(PreChapNum = as.character(ChapterNum.x),
+         PostChapNum = as.character(ChapterNum.y))
+
+# perform linear mixed models for chapters 4, 5, and 6
+alltests_sub <- alltests[alltests$PreChapNum %in% c('3','4','5','6','7') &
+                           alltests$PostChapNum %in% c('C3','C4','C5','C6','C7'),]
+
+## Chapter 3 Posttest Scores with Chapter 4 Pretest Scores
+alltests_34 <- alltests_sub[alltests_sub$PreChapNum %in% c('4') &
+                           alltests_sub$PostChapNum %in% c('C3'),]
+
+m34 <- glmer(PreResponse ~ PostScore + (1|StudentNum),
+             data = alltests_34, family = binomial)
+summary(m34)
+
+## Chapter 4 Pretest Scores with Chapter 4 Posttest Scores
+alltests_44 <- alltests_sub[alltests_sub$PreChapNum == '4' &
+                           alltests_sub$PostChapNum == 'C4',]
+
+m44 <- glmer(PostScore ~ PreResponse + (1|StudentNum),
+             data = alltests_44, family = binomial)
+summary(m44)
 
 
+## Chapter 4 Posttest Scores with Chapter 5 Pretest Scores
+alltests_45 <- alltests_sub[alltests_sub$PreChapNum == '5' &
+                           alltests_sub$PostChapNum == 'C4',]
+
+m45 <- glmer(PreResponse ~ PostScore + (1|StudentNum),
+             data = alltests_45, family = binomial)
+summary(m45)
+
+
+## Chapter 5 Pretest Scores with Chapter 5 Posttest Scores
+alltests_55 <- alltests_sub[alltests_sub$PreChapNum == '5' &
+                           alltests_sub$PostChapNum == 'C5',]
+
+m55 <- glmer(PostScore ~ PreResponse + (1|StudentNum),
+             data = alltests_55, family = binomial)
+summary(m55)
+
+
+## Chapter 5 Posttest Scores with Chapter 6 Pretest Scores
+alltests_56 <- alltests_sub[alltests_sub$PreChapNum == '6' &
+                           alltests_sub$PostChapNum == 'C5',]
+
+m56 <- glmer(PreResponse ~ PostScore + (1|StudentNum),
+             data = alltests_56, family = binomial)
+summary(m56)
+
+
+## Chapter 6 Pretest Scores with Chapter 6 Posttest Scores
+alltests_66 <- alltests_sub[alltests_sub$PreChapNum == '6' &
+                           alltests_sub$PostChapNum == 'C6',]
+
+m66 <- glmer(PostScore ~ PreResponse + (1|StudentNum),
+             data = alltests_66, family = binomial)
+summary(m66)
+
+
+## Chapter 6 Posttest Scores with Chapter 7 Pretest Scores
+alltests_67 <- alltests_sub[alltests_sub$PreChapNum == '7' &
+                           alltests_sub$PostChapNum == 'C6',]
+
+m67 <- glmer(PreResponse ~ PostScore + (1|StudentNum),
+             data = alltests_67, family = binomial)
+summary(m67)
+
+```
