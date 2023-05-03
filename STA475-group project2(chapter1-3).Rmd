@@ -1,0 +1,141 @@
+---
+title: "STA475-Group projct2"
+author: "Fengling Jiang"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r message=FALSE}
+library(readxl)
+library(Hmisc)
+library(ggcorrplot)
+library(dplyr)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Question 1
+# Chapter 1
+chapter1 <- read_xlsx("chapterdata.xlsx", sheet = "chapter1")
+chapter1 <- data.frame(chapter1)
+kvmean1 <- chapter1$kvmean
+abmean1 <- chapter1$abmean
+premean1 <- chapter1$premean
+postmean1 <- chapter1$postmean
+cor.test(premean1,postmean1,method="pearson",use="complete.obs")
+plot(premean1, postmean1, main = "Chapter1", xlab = "premean1", ylab = "postmean1",pch = 19, frame = T)
+# add regression line
+abline(lm(postmean1 ~ premean1, data = chapter1), col = "red")
+#corr1 <- rcorr(kvmean1, abmean1, postmean1)
+#ggcorrplot(corr1$r, hc.order = T, type = "lower", lab = T)
+
+chapter2 <- read_xlsx("chapterdata.xlsx", sheet = "chapter2")
+chapter12 <- data.frame(chapter2)
+chapter2 <- data.frame(chapter2)
+kvmean2 <- chapter2$kvmean
+abmean2 <- chapter2$abmean
+premean2 <- chapter2$premean
+postmean2 <- chapter2$postmean
+cor.test(premean2,postmean2,method="pearson",use="complete.obs")
+plot(premean2, postmean2, main = "Chapter2", xlab = "premean2", ylab = "postmean2",pch = 19, frame = T)
+# add regression line
+abline(lm(postmean2 ~ premean2, data = chapter2), col = "red")
+
+chapter3 <- read_xlsx("chapterdata.xlsx", sheet = "chapter3")
+chapter3 <- data.frame(chapter3)
+chapter3 <- data.frame(chapter3)
+kvmean3 <- chapter3$kvmean
+abmean3 <- chapter3$abmean
+premean3 <- chapter3$premean
+postmean3 <- chapter3$postmean
+cor.test(premean3,postmean3,method="pearson",use="complete.obs")
+plot(premean3, postmean3, main = "Chapter3", xlab = "premean1", ylab = "postmean1",pch = 19, frame = T)
+# add regression line
+abline(lm(postmean3 ~ premean3, data = chapter1), col = "red")
+
+## convert the dataframe to numeric
+chapter1 <- chapter1 %>% mutate_all(as.numeric)
+chapter2 <- chapter2 %>% mutate_all(as.numeric)
+chapter3 <- chapter3 %>% mutate_all(as.numeric)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Question 2
+# Chapter 1
+chapter12 <- chapter1  %>% 
+  filter(preQ1 == 1)
+# Matched pair HT in R
+t.test(chapter12$kvmean,chapter12$postmean, paired = T)
+
+# Chapter 2
+chapter22 <- chapter2  %>% 
+  filter(preQ1 == 1)
+# Matched pair HT in R
+t.test(chapter22$kvmean,chapter22$postmean, paired = T)
+
+# Chapter 3
+chapter32 <- chapter3  %>% 
+  filter(preQ1 == 1)
+# Matched pair HT in R
+t.test(chapter32$kvmean,chapter32$postmean, paired = T)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Question 3
+# Chapter 1
+# Matched pair HT in R
+chapter13 <- chapter1  %>% 
+  filter(preQ11 == 1)
+# Matched pair HT in R
+t.test(chapter13$kvmean,chapter13$postmean, paired = T)
+# Chapter 2
+# Matched pair HT in R
+chapter23 <- chapter2  %>% 
+  filter(preQ11 == 1)
+# Matched pair HT in R
+t.test(chapter23$kvmean,chapter23$postmean, paired = T)
+# Chapter 3
+# Matched pair HT in R
+chapter33 <- chapter3  %>% 
+  filter(preQ11 == 1)
+# Matched pair HT in R
+t.test(chapter33$kvmean,chapter33$postmean, paired = T)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Question 4
+# Chapter 1
+# calculate the mean of variables, there are only two examples
+head(chapter1$preQ1)
+preQ1_mean <- mean(chapter1$preQ1, na.rm = T)
+preQ2_mean <- mean(chapter1$preQ2, na.rm = TRUE)
+
+# replace NA with their means 
+chapter1$preQ1 <- ifelse(is.na(chapter1$preQ1), preQ1_mean, chapter1$preQ1)
+chapter1$preQ2 <- ifelse(is.na(chapter1$preQ2), preQ2_mean, chapter1$preQ2)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Question 5
+# Chapter 1
+library(tidyverse); library(modelsummary); library(fixest);library(lmtest);library(sandwich)
+reg1 <- lm(postmean1 ~ kvmean1 + abmean1 + Age + Gender, data = chapter1)
+summary(reg1)
+modelsummary(reg1, stars = c('+'=.1, '*'=.05, '**'=.01, '***'=0.001)) # detail summary
+
+# Chapter 2
+reg2 <- lm(postmean2 ~ kvmean2 + abmean2 + Age + Gender, data = chapter1)
+summary(reg2)
+modelsummary(reg2, stars = c('+'=.1, '*'=.05, '**'=.01, '***'=0.001)) # detail summary
+
+# Chapter 3
+reg3 <- lm(postmean3 ~ kvmean3 + abmean3 + Age + Gender, data = chapter1)
+summary(reg3)
+modelsummary(reg3, stars = c('+'=.1, '*'=.05, '**'=.01, '***'=0.001)) # detail summary
+```
